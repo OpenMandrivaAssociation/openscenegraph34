@@ -33,7 +33,7 @@ BuildRequires:	pkgconfig(poppler-glib)
 BuildRequires:	pkgconfig(sdl)
 BuildRequires:	pkgconfig(x11)
 BuildRequires:	pkgconfig(zlib)
-Provides:	OpenSceneGraph = %{EVRD}
+Provides:	OpenSceneGraph34 = %{EVRD}
 Requires:	%{name}-plugins = %{EVRD}
 
 %description
