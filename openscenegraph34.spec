@@ -82,7 +82,7 @@ OpenSceneGraph shared library.
 %define devOpenThreads %mklibname OpenThreads34 -d
 %define devOpenThreadsNew %mklibname OpenThreads -d
 
-%package -n %{devOpenThreads34}
+%package -n %{devOpenThreads}
 Summary:	OpenSceneGraph development files
 Group:		Development/C++
 Requires:	%{libOpenThreads} = %{EVRD}
