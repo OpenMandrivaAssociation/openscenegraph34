@@ -10,6 +10,7 @@ License:	LGPLv2+ with exceptions
 Group:		System/Libraries
 Url:		http://www.openscenegraph.org/
 Source0:	https://github.com/openscenegraph/OpenSceneGraph/archive/%{srcname}-%{version}.tar.gz
+Patch1:		0005-c-11-narrowing-hacks-Work-around-c-11-erroring-out-n.patch
 BuildRequires:	cmake
 BuildRequires:	ffmpeg-devel
 BuildRequires:	gdal-devel
