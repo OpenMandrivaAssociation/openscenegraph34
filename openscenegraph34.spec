@@ -75,8 +75,8 @@ Group:		System/Libraries
 OpenSceneGraph shared library.
 
 %files -n %{libOpenThreads}
-%{_libdir}/libOpenThreads.so.%{OpenThreads_major}
-%{_libdir}/libOpenThreads.so.3.3.0
+#{_libdir}/libOpenThreads.so.%{OpenThreads_major}
+#{_libdir}/libOpenThreads.so.3.3.0
 
 #----------------------------------------------------------------------------
 
