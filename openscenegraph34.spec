@@ -94,7 +94,7 @@ OpenSceneGraph development files.
 
 %files -n %{devOpenThreads}
 %{_includedir}/OpenThreads
-%{_libdir}/libOpenThreads.so
+#{_libdir}/libOpenThreads.so
 %{_libdir}/pkgconfig/openthreads.pc
 
 #----------------------------------------------------------------------------
