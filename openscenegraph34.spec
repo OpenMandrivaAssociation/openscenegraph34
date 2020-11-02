@@ -75,8 +75,8 @@ Group:		System/Libraries
 OpenSceneGraph shared library.
 
 %files -n %{libOpenThreads}
-#{_libdir}/libOpenThreads.so.%{OpenThreads_major}
-#{_libdir}/libOpenThreads.so.3.3.0
+%{_libdir}/libOpenThreads.so.%{OpenThreads_major}
+%{_libdir}/libOpenThreads.so.3.3.0
 
 #----------------------------------------------------------------------------
 
@@ -94,7 +94,7 @@ OpenSceneGraph development files.
 
 %files -n %{devOpenThreads}
 %{_includedir}/OpenThreads
-#{_libdir}/libOpenThreads.so
+%{_libdir}/libOpenThreads.so
 %{_libdir}/pkgconfig/openthreads.pc
 
 #----------------------------------------------------------------------------
@@ -733,9 +733,13 @@ This package contains development files for %{name}
 %build
 CFLAGS="%{optflags} -pthread"
 CXXFLAGS="%{optflags} -std=gnu++11 -pthread"
-%cmake -DDESIRED_QT_VERSION=5
-%make VERBOSE=TRUE
+%cmake \
+        -DDESIRED_QT_VERSION=5 \
+        -DLIB_POSTFIX=64 \
+        -DCMAKE_RELWITHDEBINFO_POSTFIX="" \
+        -G Ninja
+VERBOSE=true %ninja_build
 
 %install
-%makeinstall_std -C build
+%ninja_install -C build
 
