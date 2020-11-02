@@ -4,7 +4,7 @@
 Summary:	A C++ scene graph API on OpenGL for real time graphics
 Name:		openscenegraph34
 Version:	3.4.1
-Release:	1
+Release:	2
 Epoch:		1
 License:	LGPLv2+ with exceptions
 Group:		System/Libraries
@@ -733,9 +733,14 @@ This package contains development files for %{name}
 %build
 CFLAGS="%{optflags} -pthread"
 CXXFLAGS="%{optflags} -std=gnu++11 -pthread"
-%cmake -DDESIRED_QT_VERSION=5
-%make VERBOSE=TRUE
+%cmake \
+%ifarch aarch64 %{x86_64} riscv64 ppc64 ppc64le
+	-DLIB_POSTFIX=64 \
+%endif        
+        -DDESIRED_QT_VERSION=5 \
+        -DCMAKE_RELWITHDEBINFO_POSTFIX=""
+%make_build VERBOSE=true
 
 %install
-%makeinstall_std -C build
+%make_install -C build
 
