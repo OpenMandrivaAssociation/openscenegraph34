@@ -734,12 +734,13 @@ This package contains development files for %{name}
 CFLAGS="%{optflags} -pthread"
 CXXFLAGS="%{optflags} -std=gnu++11 -pthread"
 %cmake \
+%ifarch aarch64 %{x86_64} riscv64 ppc64 ppc64le
+	-DLIB_POSTFIX=64 \
+%endif        
         -DDESIRED_QT_VERSION=5 \
-        -DLIB_POSTFIX=64 \
-        -DCMAKE_RELWITHDEBINFO_POSTFIX="" \
-        -G Ninja
-VERBOSE=true %ninja_build
+        -DCMAKE_RELWITHDEBINFO_POSTFIX=""
+%make_build VERBOSE=true
 
 %install
-%ninja_install -C build
+%make_install -C build
 
