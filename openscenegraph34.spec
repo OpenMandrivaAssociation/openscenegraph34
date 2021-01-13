@@ -4,7 +4,7 @@
 Summary:	A C++ scene graph API on OpenGL for real time graphics
 Name:		openscenegraph34
 Version:	3.4.1
-Release:	2
+Release:	3
 Epoch:		1
 License:	LGPLv2+ with exceptions
 Group:		System/Libraries
