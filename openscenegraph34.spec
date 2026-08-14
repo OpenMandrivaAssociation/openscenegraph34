@@ -4,13 +4,14 @@
 Summary:	A C++ scene graph API on OpenGL for real time graphics
 Name:		openscenegraph34
 Version:	3.4.1
-Release:	4
+Release:	5
 Epoch:		1
 License:	LGPLv2+ with exceptions
 Group:		System/Libraries
 Url:		https://www.openscenegraph.org/
 Source0:	https://github.com/openscenegraph/OpenSceneGraph/archive/%{srcname}-%{version}.tar.gz
 Patch1:		0005-c-11-narrowing-hacks-Work-around-c-11-erroring-out-n.patch
+Patch2:		openscenegraph34-ffmpeg9.patch
 BuildRequires:	cmake
 BuildRequires:	ffmpeg-devel
 BuildRequires:	gdal-devel

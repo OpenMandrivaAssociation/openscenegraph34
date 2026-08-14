@@ -1,0 +1,223 @@
+diff -Nru a/src/osgPlugins/ffmpeg/FFmpegDecoderAudio.cpp b/src/osgPlugins/ffmpeg/FFmpegDecoderAudio.cpp
+--- a/src/osgPlugins/ffmpeg/FFmpegDecoderAudio.cpp	2017-08-28 18:50:49.000000000 +0200
++++ b/src/osgPlugins/ffmpeg/FFmpegDecoderAudio.cpp	2026-08-14 19:25:08.275285181 +0200
+@@ -35,7 +35,7 @@
+ #if LIBAVCODEC_VERSION_MAJOR >= 53 || (LIBAVCODEC_VERSION_MAJOR==52 && LIBAVCODEC_VERSION_MINOR>=32)
+ 
+     AVPacket avpkt;
+-    av_init_packet(&avpkt);
++    memset(&avpkt, 0, sizeof(avpkt));
+     avpkt.data = const_cast<uint8_t *>(buf);
+     avpkt.size = buf_size;
+ 
+@@ -45,12 +45,18 @@
+     if (!frame)
+         return AVERROR(ENOMEM);
+ 
+-    ret = avcodec_decode_audio4(avctx, frame, &got_frame, &avpkt);
++    ret = avcodec_send_packet(avctx, &avpkt);
++    if (ret >= 0) {
++        ret = avcodec_receive_frame(avctx, frame);
++        got_frame = (ret == 0);
++        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
++            ret = 0;
++    }
+ 
+ #ifdef USE_AVRESAMPLE    // libav's AVFrame structure does not contain a 'channels' field
+     if (ret >= 0 && got_frame) {
+ #else
+-    if (ret >= 0 && got_frame && av_frame_get_channels(frame)>0) {
++    if (ret >= 0 && got_frame && frame->ch_layout.nb_channels>0) {
+ #endif
+         int ch, plane_size;
+         int planar = av_sample_fmt_is_planar(avctx->sample_fmt);
+@@ -92,9 +98,9 @@
+ 
+             memcpy(samples, frame->extended_data[0], plane_size);
+ 
+-            if (planar && avctx->channels > 1) {
++            if (planar && avctx->ch_layout.nb_channels > 1) {
+                 uint8_t *out = ((uint8_t *)samples) + plane_size;
+-                for (ch = 1; ch < avctx->channels; ch++) {
++                for (ch = 1; ch < avctx->ch_layout.nb_channels; ch++) {
+                     memcpy(out, frame->extended_data[ch], plane_size);
+                     out += plane_size;
+                 }
+@@ -151,10 +157,15 @@
+             return;
+ 
+         m_stream = stream;
+-        m_context = stream->codec;
++        const AVCodec *p_codec = avcodec_find_decoder(stream->codecpar->codec_id);
++        if (p_codec == 0)
++            throw std::runtime_error("avcodec_find_decoder() failed");
++        m_context = avcodec_alloc_context3(p_codec);
++        if (!m_context || avcodec_parameters_to_context(m_context, stream->codecpar) < 0)
++            throw std::runtime_error("avcodec_parameters_to_context() failed");
+ 
+         m_in_sample_rate = m_context->sample_rate;
+-        m_in_nb_channels = m_context->channels;
++        m_in_nb_channels = m_context->ch_layout.nb_channels;
+         m_in_sample_format = m_context->sample_fmt;
+ 
+         AVDictionaryEntry *opt_out_sample_rate = av_dict_get( *parameters->getOptions(), "out_sample_rate", NULL, 0 );
+@@ -189,14 +200,20 @@
+             m_in_sample_rate,
+             m_out_sample_rate);
+ #endif
+-            m_swr_context = swr_alloc_set_opts(NULL,
+-                    av_get_default_channel_layout(m_out_nb_channels),
++            AVChannelLayout out_ch, in_ch;
++            av_channel_layout_default(&out_ch, m_out_nb_channels);
++            av_channel_layout_default(&in_ch, m_in_nb_channels);
++            m_swr_context = NULL;
++            swr_alloc_set_opts2(&m_swr_context,
++                    &out_ch,
+                     m_out_sample_format,
+                     m_out_sample_rate,
+-                    av_get_default_channel_layout(m_in_nb_channels),
++                    &in_ch,
+                     m_in_sample_format,
+                     m_in_sample_rate,
+                     0, NULL );
++            av_channel_layout_uninit(&out_ch);
++            av_channel_layout_uninit(&in_ch);
+ 
+             int err = swr_init(m_swr_context);
+ 
+@@ -213,17 +230,6 @@
+         if (m_context->codec_id == AV_CODEC_ID_NONE)
+             throw std::runtime_error("invalid audio codec");;
+ 
+-        // Find the decoder for the audio stream
+-        AVCodec * const p_codec = avcodec_find_decoder(m_context->codec_id);
+-
+-        if (p_codec == 0)
+-            throw std::runtime_error("avcodec_find_decoder() failed");
+-
+-        // Inform the codec that we can handle truncated bitstreams
+-        //if (p_codec->capabilities & CODEC_CAP_TRUNCATED)
+-        //    m_context->flags |= CODEC_FLAG_TRUNCATED;
+-
+-        // Open codec
+         if (avcodec_open2(m_context, p_codec, NULL) < 0)
+             throw std::runtime_error("avcodec_open() failed");
+ 
+diff -Nru a/src/osgPlugins/ffmpeg/FFmpegDecoderVideo.cpp b/src/osgPlugins/ffmpeg/FFmpegDecoderVideo.cpp
+--- a/src/osgPlugins/ffmpeg/FFmpegDecoderVideo.cpp	2017-08-28 18:50:49.000000000 +0200
++++ b/src/osgPlugins/ffmpeg/FFmpegDecoderVideo.cpp	2026-08-14 19:24:58.460100372 +0200
+@@ -62,7 +62,12 @@
+ void FFmpegDecoderVideo::open(AVStream * const stream)
+ {
+     m_stream = stream;
+-    m_context = stream->codec;
++    m_codec = avcodec_find_decoder(stream->codecpar->codec_id);
++    if (m_codec == 0)
++        throw std::runtime_error("avcodec_find_decoder() failed");
++    m_context = avcodec_alloc_context3(m_codec);
++    if (!m_context || avcodec_parameters_to_context(m_context, stream->codecpar) < 0)
++        throw std::runtime_error("avcodec_parameters_to_context() failed");
+ 
+     // Trust the video size given at this point
+     // (avcodec_open seems to sometimes return a 0x0 size)
+@@ -80,16 +85,6 @@
+     m_frame_rate = av_q2d(stream->r_frame_rate);
+     #endif
+ 
+-    // Find the decoder for the video stream
+-    m_codec = avcodec_find_decoder(m_context->codec_id);
+-
+-    if (m_codec == 0)
+-        throw std::runtime_error("avcodec_find_decoder() failed");
+-
+-    // Inform the codec that we can handle truncated bitstreams
+-    //if (p_codec->capabilities & CODEC_CAP_TRUNCATED)
+-    //    m_context->flags |= CODEC_FLAG_TRUNCATED;
+-
+     // Open codec
+     if (avcodec_open2(m_context, m_codec, NULL) < 0)
+         throw std::runtime_error("avcodec_open() failed");
+@@ -99,11 +94,11 @@
+ 
+     // Allocate converted RGB frame
+     m_frame_rgba.reset(av_frame_alloc());
+-    m_buffer_rgba[0].resize(avpicture_get_size(AV_PIX_FMT_RGB24, width(), height()));
++    m_buffer_rgba[0].resize(av_image_get_buffer_size(AV_PIX_FMT_RGB24, width(), height(), 1));
+     m_buffer_rgba[1].resize(m_buffer_rgba[0].size());
+ 
+     // Assign appropriate parts of the buffer to image planes in m_frame_rgba
+-    avpicture_fill((AVPicture *) (m_frame_rgba).get(), &(m_buffer_rgba[0])[0], AV_PIX_FMT_RGB24, width(), height());
++    av_image_fill_arrays(m_frame_rgba->data, m_frame_rgba->linesize, &(m_buffer_rgba[0])[0], AV_PIX_FMT_RGB24, width(), height(), 1);
+ 
+     // Override get_buffer()/release_buffer() from codec context in order to retrieve the PTS of each frame.
+     m_context->opaque = this;
+@@ -169,13 +164,14 @@
+             int frame_finished = 0;
+ 
+             // We want to use the entire packet since some codecs will require extra information for decoding
+-            const int bytes_decoded = avcodec_decode_video2(m_context, m_frame.get(), &frame_finished, &(packet.packet));
+-
+-            if (bytes_decoded < 0)
+-                throw std::runtime_error("avcodec_decode_video failed()");
+-
+-            m_bytes_remaining -= bytes_decoded;
+-            m_packet_data += bytes_decoded;
++            int send = avcodec_send_packet(m_context, &(packet.packet));
++            if (send < 0 && send != AVERROR(EAGAIN) && send != AVERROR_EOF)
++                throw std::runtime_error("avcodec_send_packet failed()");
++            m_bytes_remaining = 0;
++            int rec = avcodec_receive_frame(m_context, m_frame.get());
++            frame_finished = (rec == 0);
++            if (rec < 0 && rec != AVERROR(EAGAIN) && rec != AVERROR_EOF)
++                throw std::runtime_error("avcodec_receive_frame failed()");
+ 
+             // Publish the frame if we have decoded a complete frame
+             if (frame_finished)
+@@ -314,7 +310,7 @@
+     AVPicture * const dst = (AVPicture *) m_frame_rgba.get();
+ 
+     // Assign appropriate parts of the buffer to image planes in m_frame_rgba
+-    avpicture_fill((AVPicture *) (m_frame_rgba).get(), &(m_buffer_rgba[m_writeBuffer])[0], AV_PIX_FMT_RGB24, width(), height());
++    av_image_fill_arrays(m_frame_rgba->data, m_frame_rgba->linesize, &(m_buffer_rgba[m_writeBuffer])[0], AV_PIX_FMT_RGB24, width(), height(), 1);
+ 
+     // Convert YUVA420p (i.e. YUV420p plus alpha channel) using our own routine
+ 
+diff -Nru a/src/osgPlugins/ffmpeg/FFmpegDecoderVideo.hpp b/src/osgPlugins/ffmpeg/FFmpegDecoderVideo.hpp
+--- a/src/osgPlugins/ffmpeg/FFmpegDecoderVideo.hpp	2017-08-28 18:50:49.000000000 +0200
++++ b/src/osgPlugins/ffmpeg/FFmpegDecoderVideo.hpp	2026-08-14 19:24:47.960309484 +0200
+@@ -101,7 +101,7 @@
+     FFmpegClocks &          m_clocks;
+     AVStream *              m_stream;
+     AVCodecContext *        m_context;
+-    AVCodec *               m_codec;
++    const AVCodec *         m_codec;
+     const uint8_t *         m_packet_data;
+     int                     m_bytes_remaining;
+     int64_t                 m_packet_pts;
+diff -Nru a/src/osgPlugins/ffmpeg/FFmpegHeaders.hpp b/src/osgPlugins/ffmpeg/FFmpegHeaders.hpp
+--- a/src/osgPlugins/ffmpeg/FFmpegHeaders.hpp	2017-08-28 18:50:49.000000000 +0200
++++ b/src/osgPlugins/ffmpeg/FFmpegHeaders.hpp	2026-08-14 19:25:08.244960890 +0200
+@@ -10,6 +10,11 @@
+ #include <stdint.h>
+ #include <libavcodec/avcodec.h>
+ #include <libavformat/avformat.h>
++#include <libavutil/imgutils.h>
++#include <libavutil/channel_layout.h>
++#ifndef AVPicture
++typedef AVFrame AVPicture;
++#endif
+ 
+ #ifdef USE_AVRESAMPLE    // To compile using libav instead of ffmpeg
+ 
+diff -Nru a/src/osgPlugins/ffmpeg/ReaderWriterFFmpeg.cpp b/src/osgPlugins/ffmpeg/ReaderWriterFFmpeg.cpp
+--- a/src/osgPlugins/ffmpeg/ReaderWriterFFmpeg.cpp	2017-08-28 18:50:49.000000000 +0200
++++ b/src/osgPlugins/ffmpeg/ReaderWriterFFmpeg.cpp	2026-08-14 19:24:58.460100372 +0200
+@@ -118,7 +118,7 @@
+         av_lockmgr_register(&lockMgr);
+ #endif
+         // Register all FFmpeg formats/codecs
+-        av_register_all();
++        /* av_register_all() is a no-op since FFmpeg 4 */
+ 
+         avformat_network_init();
+     }
