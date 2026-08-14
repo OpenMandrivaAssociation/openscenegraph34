@@ -738,9 +738,10 @@ CXXFLAGS="%{optflags} -std=gnu++11 -pthread"
 %cmake \
 %ifarch aarch64 %{x86_64} riscv64 ppc64 ppc64le
 	-DLIB_POSTFIX=64 \
-%endif        
-        -DDESIRED_QT_VERSION=5 \
-        -DCMAKE_RELWITHDEBINFO_POSTFIX=""
+%endif
+	-DOpenGL_GL_PREFERENCE=LEGACY \
+	-DDESIRED_QT_VERSION=5 \
+	-DCMAKE_RELWITHDEBINFO_POSTFIX=""
 %make_build VERBOSE=true
 
 %install
