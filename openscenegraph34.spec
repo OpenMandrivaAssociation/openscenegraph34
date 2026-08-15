@@ -13,6 +13,7 @@ Source0:	https://github.com/openscenegraph/OpenSceneGraph/archive/%{srcname}-%{v
 Patch1:		0005-c-11-narrowing-hacks-Work-around-c-11-erroring-out-n.patch
 Patch2:		openscenegraph34-ffmpeg9.patch
 Patch3:		openscenegraph34-cmake4.patch
+Patch4:		openscenegraph34-ffmpeg9-leftovers.patch
 BuildRequires:	cmake
 BuildRequires:	ffmpeg-devel
 BuildRequires:	gdal-devel
@@ -24,7 +25,7 @@ BuildRequires:	pkgconfig(cairo)
 BuildRequires:	pkgconfig(freetype2)
 BuildRequires:	pkgconfig(gl)
 BuildRequires:	pkgconfig(IlmBase)
-BuildRequires:	pkgconfig(libxine)
+# xine plugin is C89 and broken on clang 23; drop it rather than fight xine_xmalloc_aligned
 BuildRequires:	pkgconfig(libcurl)
 BuildRequires:	pkgconfig(jasper)
 BuildRequires:	pkgconfig(libpng)

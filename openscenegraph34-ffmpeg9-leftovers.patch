@@ -1,0 +1,86 @@
+diff -Nru a/src/osgPlugins/ffmpeg/FFmpegDecoder.cpp b/src/osgPlugins/ffmpeg/FFmpegDecoder.cpp
+--- a/src/osgPlugins/ffmpeg/FFmpegDecoder.cpp	2017-08-28 18:50:49.000000000 +0200
++++ b/src/osgPlugins/ffmpeg/FFmpegDecoder.cpp	2026-08-15 02:03:14.757877098 +0200
+@@ -62,7 +62,7 @@
+     {
+         // Open video file
+         AVFormatContext * p_format_context = 0;
+-        AVInputFormat *iformat = 0;
++        const AVInputFormat *iformat = 0;
+ 
+         if (filename.compare(0, 5, "/dev/")==0)
+         {
+@@ -304,10 +304,13 @@
+         else
+         {
+             // Make the packet data available beyond av_read_frame() logical scope.
+-            if ((error = av_dup_packet(&packet)) < 0) {
+-                OSG_FATAL << "av_dup_packet() returned " << AvStrError(error) << std::endl;
+-                throw std::runtime_error("av_dup_packet() failed");
++            AVPacket owned;
++            memset(&owned, 0, sizeof(owned));
++            if ((error = av_packet_ref(&owned, &packet)) < 0) {
++                OSG_FATAL << "av_packet_ref() returned " << AvStrError(error) << std::endl;
++                throw std::runtime_error("av_packet_ref() failed");
+             }
++            packet = owned;
+ 
+             m_pending_packet = FFmpegPacket(packet);
+         }
+diff -Nru a/src/osgPlugins/ffmpeg/FFmpegDecoderAudio.cpp b/src/osgPlugins/ffmpeg/FFmpegDecoderAudio.cpp
+--- a/src/osgPlugins/ffmpeg/FFmpegDecoderAudio.cpp	2026-08-15 02:03:14.733909471 +0200
++++ b/src/osgPlugins/ffmpeg/FFmpegDecoderAudio.cpp	2026-08-15 02:03:14.758065210 +0200
+@@ -266,6 +266,8 @@
+             join();
+     }
+     swr_free(&m_swr_context);
++    if (m_context)
++        avcodec_free_context(&m_context);
+ }
+ 
+ void FFmpegDecoderAudio::setVolume(float volume)
+diff -Nru a/src/osgPlugins/ffmpeg/FFmpegDecoderVideo.cpp b/src/osgPlugins/ffmpeg/FFmpegDecoderVideo.cpp
+--- a/src/osgPlugins/ffmpeg/FFmpegDecoderVideo.cpp	2026-08-15 02:03:14.734016332 +0200
++++ b/src/osgPlugins/ffmpeg/FFmpegDecoderVideo.cpp	2026-08-15 02:03:14.757996870 +0200
+@@ -51,7 +51,7 @@
+ 
+     if (m_context)
+     {
+-        avcodec_close(m_context);
++        avcodec_free_context(&m_context);
+     }
+ 
+     OSG_INFO<<"Destructed FFmpegDecoderVideo"<<std::endl;
+diff -Nru a/src/osgPlugins/ffmpeg/FFmpegPacket.hpp b/src/osgPlugins/ffmpeg/FFmpegPacket.hpp
+--- a/src/osgPlugins/ffmpeg/FFmpegPacket.hpp	2017-08-28 18:50:49.000000000 +0200
++++ b/src/osgPlugins/ffmpeg/FFmpegPacket.hpp	2026-08-15 02:03:14.757941709 +0200
+@@ -42,7 +42,7 @@
+         void clear()
+         {
+             if (packet.data != 0)
+-                av_free_packet(&packet);
++                av_packet_unref(&packet);
+ 
+             release();
+         }
+diff -Nru a/src/osgPlugins/ffmpeg/FFmpegParameters.hpp b/src/osgPlugins/ffmpeg/FFmpegParameters.hpp
+--- a/src/osgPlugins/ffmpeg/FFmpegParameters.hpp	2017-08-28 18:50:49.000000000 +0200
++++ b/src/osgPlugins/ffmpeg/FFmpegParameters.hpp	2026-08-15 02:03:14.758113301 +0200
+@@ -20,7 +20,7 @@
+ 
+     bool isFormatAvailable() const { return m_format!=NULL; }
+     
+-    AVInputFormat* getFormat() { return m_format; }
++    const AVInputFormat* getFormat() { return m_format; }
+     AVDictionary** getOptions() { return &m_options; }
+     void setContext(AVIOContext* context) { m_context = context; }
+     AVIOContext* getContext() { return m_context; }
+@@ -29,7 +29,7 @@
+ 
+ protected:
+ 
+-    AVInputFormat* m_format;
++    const AVInputFormat* m_format;
+     AVIOContext* m_context;
+     AVDictionary* m_options;
+ };
