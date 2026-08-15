@@ -14,6 +14,7 @@ Patch1:		0005-c-11-narrowing-hacks-Work-around-c-11-erroring-out-n.patch
 Patch2:		openscenegraph34-ffmpeg9.patch
 Patch3:		openscenegraph34-cmake4.patch
 Patch4:		openscenegraph34-ffmpeg9-leftovers.patch
+Patch5:		openscenegraph34-no-lockmgr.patch
 BuildRequires:	cmake
 BuildRequires:	ffmpeg-devel
 BuildRequires:	gdal-devel
